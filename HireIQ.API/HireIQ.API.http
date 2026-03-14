@@ -1,0 +1,6 @@
+@HireIQ.API_HostAddress = http://localhost:5201
+
+GET {{HireIQ.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
