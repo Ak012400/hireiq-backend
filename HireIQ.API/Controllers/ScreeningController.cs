@@ -4,11 +4,13 @@ using HireIQ.API.Data;
 using HireIQ.API.DTOs;
 using HireIQ.API.Models;
 using HireIQ.API.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace HireIQ.API.Controllers;
 
 [ApiController]
 [Route("api/screening")]
+[Authorize]
 public class ScreeningController : BaseController
 {
     private readonly AppDbContext _db;

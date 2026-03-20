@@ -4,11 +4,13 @@ using HireIQ.API.Data;
 using HireIQ.API.DTOs;
 using HireIQ.API.Models;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace HireIQ.API.Controllers;
 
 [ApiController]
 [Route("api/resumes")]
+[Authorize]
 public class ResumeController : BaseController
 {
     private readonly AppDbContext _db;
