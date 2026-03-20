@@ -9,7 +9,7 @@ namespace HireIQ.API.Controllers;
 
 [ApiController]
 [Route("api/resumes")]
-public class ResumeController : ControllerBase
+public class ResumeController : BaseController
 {
     private readonly AppDbContext _db;
 
@@ -21,16 +21,15 @@ public class ResumeController : ControllerBase
     [HttpPost]
 public async Task<IActionResult> Create(CreateResumeDTO dto)
 {
-    // Pehla user lo DB se (temporary fix)
-    var user = await _db.Users.FirstOrDefaultAsync();
-    if (user == null)
+        var user = GetCurrentUserId();
+    if (string.IsNullOrEmpty(user.ToString()))
         return BadRequest(new { error = "No user found!" });
 
     var resume = new Resume
     {
         CandidateName = dto.CandidateName,
         Content = dto.Content,
-        UserId = user.Id  // ← Pehla user use karo
+        UserId = user
     };
 
     _db.Resumes.Add(resume);
@@ -48,7 +47,8 @@ public async Task<IActionResult> Create(CreateResumeDTO dto)
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var resumes = await _db.Resumes
+        var userId = GetCurrentUserId();
+        var resumes = await _db.Resumes.Where(r=> r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt)
             .Select(r => new ResumeResponseDTO
             {
@@ -65,7 +65,9 @@ public async Task<IActionResult> Create(CreateResumeDTO dto)
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var resume = await _db.Resumes.FindAsync(id);
+        var userId = GetCurrentUserId();
+        var resume = await _db.Resumes
+            .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
         if (resume == null)
             return NotFound(new { error = "Resume not found!" });
 
@@ -81,7 +83,9 @@ public async Task<IActionResult> Create(CreateResumeDTO dto)
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var resume = await _db.Resumes.FindAsync(id);
+        var userId = GetCurrentUserId();
+        var resume = await _db.Resumes
+            .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
         if (resume == null)
             return NotFound(new { error = "Resume not found!" });
 
