@@ -23,7 +23,7 @@ public class AuthController : ControllerBase
             return BadRequest(new { error = "Email already exists!" });
         return Ok(result);
     }
-
+    //Have to add the [Authorize] attribute to this endpoint to ensure that only authenticated users can access it.
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDTO dto)
     {
