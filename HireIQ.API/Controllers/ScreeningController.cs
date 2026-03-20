@@ -41,10 +41,10 @@ public class ScreeningController : ControllerBase
         // Deep analyze if requested
         if (dto.DeepAnalyze)
         {
-            var result = await _mlService.DeepAnalyze(
+            var result = await _mlService.QuickScore(
                 resume.Content, job.Content
             );
-            analysis = result?.ToString();
+            analysis = result.ToString();
         }
 
         // Save to DB
