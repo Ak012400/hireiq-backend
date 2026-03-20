@@ -5,78 +5,84 @@ namespace HireIQ.API.Services;
 
 public class MLService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly HttpClient _client;
+    private readonly string _hfToken;
+    private const string BASE_URL =
+        "https://98012arun-minilm.hf.space";
 
-    public MLService(IHttpClientFactory httpClientFactory)
+    public MLService(IConfiguration config)
     {
-        _httpClientFactory = httpClientFactory;
+        _hfToken = config["HFSettings:Token"] ??
+                   Environment.GetEnvironmentVariable("HF_TOKEN") ?? "";
+        _client = new HttpClient();
+        _client.Timeout = TimeSpan.FromSeconds(60);
+        _client.DefaultRequestHeaders.Add(
+            "Authorization", $"Bearer {_hfToken}"
+        );
     }
-
-    private HttpClient Client => 
-        _httpClientFactory.CreateClient("FlaskService");
 
     public async Task<double> QuickScore(
         string resumeText, string jdText)
     {
-        var payload = new { resume = resumeText, jd = jdText };
-        var response = await PostAsync("/ml/quick-score", payload);
-        return response?.GetProperty("score").GetDouble() ?? 0;
-    }
-
-    public async Task<object?> DeepAnalyze(
-        string resumeText, string jdText)
-    {
-        var payload = new { resume = resumeText, jd = jdText };
-        var response = await PostAsync("/ml/deep-analyze", payload);
-        return response;
-    }
-
-    public async Task<string> Chat(
-        string message, string userId)
-    {
-        var payload = new { message, user_id = userId };
-        var response = await PostAsync("/ml/chat", payload);
-        return response?.GetProperty("response")
-            .GetString() ?? "Error";
-    }
-
-    public async Task<byte[]?> BuildResumePdf(
-        Dictionary<string, string> resumeData)
-    {
-        var client = Client;
-        var json = JsonSerializer.Serialize(resumeData);
-        var content = new StringContent(
-            json, Encoding.UTF8, "application/json"
-        );
-
-        var response = await client.PostAsync(
-            "/ml/build-resume", content
-        );
-
-        if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadAsByteArrayAsync();
-    }
-
-    private async Task<JsonElement?> PostAsync(
-        string endpoint, object payload)
-    {
         try
         {
-            var client = Client;
+            // Step 1: POST karo event_id lo
+            var payload = new
+            {
+                data = new[] { resumeText, jdText }
+            };
+
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(
                 json, Encoding.UTF8, "application/json"
             );
 
-            var response = await client.PostAsync(endpoint, content);
-            if (!response.IsSuccessStatusCode) return null;
+            var postResponse = await _client.PostAsync(
+                $"{BASE_URL}/gradio_api/call/score_resume",
+                content
+            );
 
-            var result = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<JsonElement>(result);
+            var postResult = await postResponse.Content
+                .ReadAsStringAsync();
+
+            var eventData = JsonSerializer
+                .Deserialize<JsonElement>(postResult);
+            var eventId = eventData
+                .GetProperty("event_id")
+                .GetString();
+
+            // Step 2: GET result
+            var getResponse = await _client.GetAsync(
+                $"{BASE_URL}/gradio_api/call/score_resume/{eventId}"
+            );
+
+            var getResult = await getResponse.Content
+                .ReadAsStringAsync();
+
+            // Parse SSE response
+            var lines = getResult.Split('\n');
+            foreach (var line in lines)
+            {
+                if (line.StartsWith("data: "))
+                {
+                    var data = line.Substring(6);
+                    var parsed = JsonSerializer
+                        .Deserialize<JsonElement>(data);
+                    if (parsed.ValueKind == JsonValueKind.Array)
+                    {
+                        var scoreObj = parsed[0];
+                        return scoreObj
+                            .GetProperty("score")
+                            .GetDouble();
+                    }
+                }
+            }
+            return 0;
         }
-        catch
+        catch (Exception e)
         {
-            return null;
+            Console.WriteLine($"MiniLM error: {e.Message}");
+            return 0;
         }
     }
 }
