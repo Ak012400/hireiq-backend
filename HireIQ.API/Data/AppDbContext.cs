@@ -48,8 +48,13 @@ modelBuilder.Entity<ScreeningResult>().Property(s => s.MinilmScore).HasColumnNam
 modelBuilder.Entity<ScreeningResult>().Property(s => s.HireiqAnalysis).HasColumnName("hireiq_analysis");
 modelBuilder.Entity<ScreeningResult>().Property(s => s.Shortlisted).HasColumnName("shortlisted");
 modelBuilder.Entity<ScreeningResult>().Property(s => s.CreatedAt).HasColumnName("created_at");
+            modelBuilder.Entity<ScreeningResult>()
+    .HasOne(s => s.JobDescription)
+    .WithMany()
+    .HasForeignKey(s => s.JdId)
+    .HasPrincipalKey(j => j.Id);
 
-modelBuilder.Entity<Conversation>().ToTable("conversations");
+            modelBuilder.Entity<Conversation>().ToTable("conversations");
 modelBuilder.Entity<Conversation>().Property(c => c.Id).HasColumnName("id");
 modelBuilder.Entity<Conversation>().Property(c => c.UserId).HasColumnName("user_id");
 modelBuilder.Entity<Conversation>().Property(c => c.Role).HasColumnName("role");

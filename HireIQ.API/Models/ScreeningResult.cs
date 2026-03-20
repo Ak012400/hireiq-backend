@@ -1,4 +1,5 @@
-namespace HireIQ.API.Models;
+﻿using HireIQ.API.Models;
+using System.ComponentModel.DataAnnotations.Schema;
 
 public class ScreeningResult
 {
@@ -10,5 +11,8 @@ public class ScreeningResult
     public bool Shortlisted { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Resume? Resume { get; set; }
+
+    // ← Navigation property ka naam change karo!
+    [System.Text.Json.Serialization.JsonIgnore]
     public JobDescription? JobDescription { get; set; }
 }
