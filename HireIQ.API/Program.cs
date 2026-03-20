@@ -34,8 +34,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 // Services
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<PdfService>();
+builder.Services.AddScoped<PdfExtractorService>();
 builder.Services.AddScoped<MLService>();
 builder.Services.AddScoped<GroqService>();
+
 
 // HttpClient — Flask service ke liye
 builder.Services.AddHttpClient("FlaskService", client =>

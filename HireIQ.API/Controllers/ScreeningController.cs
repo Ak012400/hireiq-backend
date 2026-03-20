@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HireIQ.API.Data;
 using HireIQ.API.DTOs;
@@ -9,7 +9,7 @@ namespace HireIQ.API.Controllers;
 
 [ApiController]
 [Route("api/screening")]
-public class ScreeningController : ControllerBase
+public class ScreeningController : BaseController
 {
     private readonly AppDbContext _db;
     private readonly MLService _mlService;
@@ -89,10 +89,18 @@ public class ScreeningController : ControllerBase
         });
     }
 
+    // GetAll me userId filter add karo
+    // RunScreening me bhi userId save karo agar future me chahiye
+
     [HttpGet("all")]
     public async Task<IActionResult> GetAll()
     {
+        var userId = GetCurrentUserId();
+
+        // Resume ke through current user ke screenings lo
         var results = await _db.ScreeningResults
+            .Include(s => s.Resume) // ✅ Resume navigate karo
+            .Where(s => s.Resume!.UserId == userId) // ✅ filter by user
             .OrderByDescending(s => s.CreatedAt)
             .Select(s => new ScreeningResponseDTO
             {
