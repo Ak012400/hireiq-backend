@@ -83,7 +83,13 @@ public class ChatController : BaseController // ✅ BaseController
         "How to transition to Data Science?",
         "What salary for fresher ML Engineer?",
         "How to write a strong resume summary?"
-    }
+     }
         });
+    }
+    [HttpPost("generate-field")]
+    public async Task<IActionResult> GenerateField([FromBody] GenerateFieldDTO dto)
+    {
+        var response = await _groqService.GenerateAsync(dto.Prompt); // no history
+        return Ok(new { result = response });
     }
 }
