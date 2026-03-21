@@ -83,29 +83,30 @@ public class PdfController : BaseController
 
     // Flow B — PDF upload → Groq AI Review
     [HttpPost("review")]
-    public async Task<IActionResult> ReviewResume(IFormFile resumeFile)
+    public async Task<IActionResult> ReviewResume(IFormFile resumeFile, [FromForm] Guid? jdId = null)
     {
-        if (resumeFile == null || resumeFile.Length == 0)
-            return BadRequest(new { error = "PDF file required!" });
-
         using var ms = new MemoryStream();
         await resumeFile.CopyToAsync(ms);
         var text = _extractor.ExtractText(ms.ToArray());
 
-        var prompt = $"""
-            Please review this resume and provide:
-            1. Overall Score (out of 100)
-            2. Key Strengths (3-4 points)
-            3. Areas to Improve (3-4 points)  
-            4. ATS Compatibility Score
-            5. Quick Recommendations
-            
-            Resume:
-            {text}
-            """;
+        string jdContext = "";
+        if (jdId.HasValue)
+        {
+            var job = await _db.JobDescriptions.FindAsync(jdId.Value);
+            if (job != null)
+                jdContext = $"\n\nJob Description to match against:\n{job.Content}";
+        }
+
+        var prompt = jdContext == ""
+            ? $"Review this resume for overall quality, ATS score, strengths and improvements:\n{text}"
+            : $"Review this resume against the job description. Give match score, skill gaps, strengths:\n\nResume:\n{text}{jdContext}";
 
         var review = await _groqService.GenerateAsync(prompt);
 
-        return Ok(new { review, extractedText = text });
+        return Ok(new
+        {
+            review,
+            extractedText = text  // ✅ Studio ke liye
+        });
     }
 }
