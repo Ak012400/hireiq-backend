@@ -16,6 +16,7 @@ namespace HireIQ.API.Data
         public DbSet<Conversation> Conversations { get; set; } = null!;
         public DbSet<GeneratedResume> GeneratedResumes { get; set; } = null!;
         public DbSet<CustomResumeField> CustomResumeFields { get; set; }= null!;
+        public DbSet<Template> Templates { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -95,6 +96,18 @@ namespace HireIQ.API.Data
                 e.Property(x => x.CreatedAt).HasColumnName("created_at");
                 e.HasOne(x => x.User).WithMany()
                  .HasForeignKey(x => x.UserId);
+            });
+            modelBuilder.Entity<Template>(entity =>
+            {
+                entity.ToTable("templates"); // [cite: 59]
+                entity.Property(e => e.Id).HasColumnName("id").HasMaxLength(50);
+                entity.Property(e => e.Name).HasColumnName("name").IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Description).HasColumnName("description");
+                entity.Property(e => e.Category).HasColumnName("category").HasMaxLength(50);
+                entity.Property(e => e.PreviewImageUrl).HasColumnName("preview_image_url");
+                entity.Property(e => e.BaseStructureJson).HasColumnName("base_structure_json").HasColumnType("jsonb");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.IsPremium).HasColumnName("is_premium").HasDefaultValue(false);
             });
 
         }

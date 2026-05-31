@@ -63,7 +63,8 @@ public class ChatController : BaseController // ✅ BaseController
     {
         var prompt = "Generate 4 short suggestion chips for an HR AI assistant. Topics: resume tips, career guidance, salary, skills. Return ONLY a JSON array of 4 strings, nothing else. Example: [\"Tip 1\", \"Tip 2\", \"Tip 3\", \"Tip 4\"]";
 
-        var response = await _groqService.GenerateAsync(prompt);
+       // var response = await _groqService.GenerateAsync(prompt);
+        var response = await _groqService.GenerateFieldAsync(prompt);
 
         // JSON parse karo
         var match = System.Text.RegularExpressions.Regex.Match(response, @"\[.*?\]",
@@ -89,7 +90,8 @@ public class ChatController : BaseController // ✅ BaseController
     [HttpPost("generate-field")]
     public async Task<IActionResult> GenerateField([FromBody] GenerateFieldDTO dto)
     {
-        var response = await _groqService.GenerateAsync(dto.Prompt); // no history
+        var response = await _groqService.GenerateAsync(dto.Prompt); // no history/  grok se karne ke liye
+        //var response = await _groqService.GenerateFieldAsync(dto.Prompt); // this is with my own modal HireIQ
         return Ok(new { result = response });
     }
 }
