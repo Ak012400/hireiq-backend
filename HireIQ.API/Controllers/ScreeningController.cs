@@ -15,11 +15,13 @@ public class ScreeningController : BaseController
 {
     private readonly AppDbContext _db;
     private readonly MLService _mlService;
+    private readonly GroqService _groqService;
 
-    public ScreeningController(AppDbContext db, MLService mlService)
+    public ScreeningController(AppDbContext db, MLService mlService, GroqService groqService)
     {
         _db = db;
         _mlService = mlService;
+        _groqService = groqService;
     }
 
     [HttpPost("run")]
@@ -116,5 +118,85 @@ public class ScreeningController : BaseController
             .ToListAsync();
 
         return Ok(results);
+    }
+    [HttpPost("bulk")]
+    public async Task<IActionResult> RunBulkScreening([FromBody] BatchScreeningDTO dto)
+    {
+        // 1. Fetch the Job Description
+        var job = await _db.JobDescriptions.FindAsync(dto.JdId);
+        if (job == null)
+            return NotFound(new { error = "Job not found!" });
+
+        // 2. Fetch all requested Resumes
+        var resumes = await _db.Resumes
+            .Where(r => dto.ResumeIds.Contains(r.Id))
+            .ToListAsync();
+
+        if (!resumes.Any())
+            return BadRequest(new { error = "No valid resumes found in the database." });
+
+        var results = new List<ScreeningResponseDTO>();
+        decimal threshold = 0.70m; // 70% threshold for Stage 1
+
+        // 3. Process the Multi-Stage Pipeline
+        foreach (var resume in resumes)
+        {
+            // 🔹 STAGE 1: Fast MiniLM Filtering
+            var score = await _mlService.QuickScore(resume.Content, job.Content);
+            decimal minilmScore = (decimal)score;
+            bool isShortlisted = minilmScore >= threshold;
+            string? aiAnalysis = null;
+
+            // 🔹 STAGE 2: Deep Groq Review (ONLY if they passed Stage 1)
+                        if (isShortlisted)
+                        {
+                            var prompt = $@"
+            You are HireIQ, an expert AI HR assistant. Analyze this candidate for the role of '{job.Title}'.
+            Job Description: {job.Content}
+            Resume: {resume.Content}
+
+            Provide:
+            1. A Score out of 100 based on exact skill matches.
+            2. Key Strengths.
+            3. Skill Gaps.
+            4. Final Interview Recommendation.
+            Make it professional and concise.";
+
+                aiAnalysis = await _groqService.GenerateAsync(prompt);
+                        }
+
+            // Save to Database
+            var screening = new ScreeningResult
+            {
+                Id = Guid.NewGuid(), // Manually assign so we can map it to DTO before SaveChanges
+                ResumeId = resume.Id,
+                JdId = job.Id,
+                MinilmScore = minilmScore,
+                HireiqAnalysis = aiAnalysis,
+                Shortlisted = isShortlisted,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.ScreeningResults.Add(screening);
+
+            // Add to response list
+            results.Add(new ScreeningResponseDTO
+            {
+                Id = screening.Id,
+                MinilmScore = screening.MinilmScore,
+                MatchLevel = minilmScore >= 0.8m ? "EXCELLENT" :
+                             minilmScore >= 0.7m ? "HIGH" :
+                             minilmScore >= 0.5m ? "MEDIUM" : "LOW",
+                Analysis = screening.HireiqAnalysis,
+                Shortlisted = screening.Shortlisted
+            });
+        }
+
+        await _db.SaveChangesAsync();
+
+        // ✅ Rank the candidates before returning (Highest score first)
+        var rankedResults = results.OrderByDescending(r => r.MinilmScore).ToList();
+
+        return Ok(rankedResults);
     }
 }
