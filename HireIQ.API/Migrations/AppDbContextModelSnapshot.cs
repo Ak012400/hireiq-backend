@@ -260,6 +260,12 @@ namespace HireIQ.API.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("shortlisted");
 
+                    b.Property<string>("CandidateStatus")
+                        .IsRequired()
+                        .HasDefaultValue("Screened")
+                        .HasColumnType("text")
+                        .HasColumnName("candidate_status");
+
                     b.HasKey("Id");
 
                     b.HasIndex("JdId");
