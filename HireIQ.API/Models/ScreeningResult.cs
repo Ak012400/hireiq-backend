@@ -9,6 +9,7 @@ public class ScreeningResult
     public decimal MinilmScore { get; set; }
     public string? HireiqAnalysis { get; set; }
     public bool Shortlisted { get; set; } = false;
+    public string CandidateStatus { get; set; } = "Screened"; // Screened | Interview | Hired | Rejected
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Resume? Resume { get; set; }
 

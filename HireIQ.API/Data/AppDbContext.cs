@@ -49,6 +49,7 @@ namespace HireIQ.API.Data
             modelBuilder.Entity<ScreeningResult>().Property(s => s.MinilmScore).HasColumnName("minilm_score");
             modelBuilder.Entity<ScreeningResult>().Property(s => s.HireiqAnalysis).HasColumnName("hireiq_analysis");
             modelBuilder.Entity<ScreeningResult>().Property(s => s.Shortlisted).HasColumnName("shortlisted");
+            modelBuilder.Entity<ScreeningResult>().Property(s => s.CandidateStatus).HasColumnName("candidate_status").HasDefaultValue("Screened");
             modelBuilder.Entity<ScreeningResult>().Property(s => s.CreatedAt).HasColumnName("created_at");
                         modelBuilder.Entity<ScreeningResult>()
                 .HasOne(s => s.JobDescription)
