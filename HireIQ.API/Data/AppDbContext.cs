@@ -17,6 +17,9 @@ namespace HireIQ.API.Data
         public DbSet<GeneratedResume> GeneratedResumes { get; set; } = null!;
         public DbSet<CustomResumeField> CustomResumeFields { get; set; }= null!;
         public DbSet<Template> Templates { get; set; }
+        public DbSet<InterviewRoom> InterviewRooms { get; set; } = null!;
+        public DbSet<MockInterviewSession> MockInterviewSessions { get; set; } = null!;
+        public DbSet<JobApplication> JobApplications { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -98,6 +101,76 @@ namespace HireIQ.API.Data
                 e.HasOne(x => x.User).WithMany()
                  .HasForeignKey(x => x.UserId);
             });
+            // InterviewRoom
+            modelBuilder.Entity<InterviewRoom>(e =>
+            {
+                e.ToTable("interview_rooms");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Id).HasColumnName("id");
+                e.Property(x => x.RoomCode).HasColumnName("room_code");
+                e.Property(x => x.RoomPassword).HasColumnName("room_password");
+                e.Property(x => x.HirerId).HasColumnName("hirer_id");
+                e.Property(x => x.JobId).HasColumnName("job_id");
+                e.Property(x => x.CandidateEmail).HasColumnName("candidate_email");
+                e.Property(x => x.CandidateUserId).HasColumnName("candidate_user_id");
+                e.Property(x => x.CandidateName).HasColumnName("candidate_name");
+                e.Property(x => x.Status).HasColumnName("status");
+                e.Property(x => x.ScheduledAt).HasColumnName("scheduled_at");
+                e.Property(x => x.StartedAt).HasColumnName("started_at");
+                e.Property(x => x.EndedAt).HasColumnName("ended_at");
+                e.Property(x => x.PresetQuestions).HasColumnName("preset_questions").HasColumnType("jsonb");
+                e.Property(x => x.AiReport).HasColumnName("ai_report");
+                e.Property(x => x.TechnicalScore).HasColumnName("technical_score");
+                e.Property(x => x.BehavioralScore).HasColumnName("behavioral_score");
+                e.Property(x => x.AttentionScore).HasColumnName("attention_score");
+                e.Property(x => x.ConfidenceScore).HasColumnName("confidence_score");
+                e.Property(x => x.EmotionScore).HasColumnName("emotion_score");
+                e.Property(x => x.CommunicationScore).HasColumnName("communication_score");
+                e.Property(x => x.FinalDecision).HasColumnName("final_decision");
+                e.Property(x => x.CreatedAt).HasColumnName("created_at");
+                e.HasOne(x => x.Hirer).WithMany().HasForeignKey(x => x.HirerId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Job).WithMany().HasForeignKey(x => x.JobId).OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // MockInterviewSession
+            modelBuilder.Entity<MockInterviewSession>(e =>
+            {
+                e.ToTable("mock_interview_sessions");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Id).HasColumnName("id");
+                e.Property(x => x.UserId).HasColumnName("user_id");
+                e.Property(x => x.JobTitle).HasColumnName("job_title");
+                e.Property(x => x.JobDescription).HasColumnName("job_description");
+                e.Property(x => x.Questions).HasColumnName("questions_json").HasColumnType("jsonb");
+                e.Property(x => x.Answers).HasColumnName("answers_json").HasColumnType("jsonb");
+                e.Property(x => x.AiEvaluation).HasColumnName("ai_evaluation");
+                e.Property(x => x.TechnicalScore).HasColumnName("technical_score");
+                e.Property(x => x.CommunicationScore).HasColumnName("communication_score");
+                e.Property(x => x.ConfidenceScore).HasColumnName("confidence_score");
+                e.Property(x => x.OverallScore).HasColumnName("overall_score");
+                e.Property(x => x.DurationSeconds).HasColumnName("duration_seconds");
+                e.Property(x => x.CreatedAt).HasColumnName("created_at");
+                e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // JobApplication
+            modelBuilder.Entity<JobApplication>(e =>
+            {
+                e.ToTable("job_applications");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Id).HasColumnName("id");
+                e.Property(x => x.JobId).HasColumnName("job_id");
+                e.Property(x => x.ApplicantUserId).HasColumnName("applicant_user_id");
+                e.Property(x => x.ResumeId).HasColumnName("resume_id");
+                e.Property(x => x.CoverLetter).HasColumnName("cover_letter");
+                e.Property(x => x.Status).HasColumnName("status");
+                e.Property(x => x.AppliedAt).HasColumnName("applied_at");
+                e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+                e.HasOne(x => x.Job).WithMany().HasForeignKey(x => x.JobId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Applicant).WithMany().HasForeignKey(x => x.ApplicantUserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasIndex(x => new { x.JobId, x.ApplicantUserId }).IsUnique();
+            });
+
             modelBuilder.Entity<Template>(entity =>
             {
                 entity.ToTable("templates"); // [cite: 59]
