@@ -5,12 +5,14 @@ using HireIQ.API.DTOs;
 using HireIQ.API.Models;
 using HireIQ.API.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace HireIQ.API.Controllers;
 
 [ApiController]
 [Route("api/screening")]
 [Authorize]
+[EnableRateLimiting("ai")]
 public class ScreeningController : BaseController
 {
     private readonly AppDbContext _db;
@@ -24,18 +26,52 @@ public class ScreeningController : BaseController
         _groqService = groqService;
     }
 
-    // ─── Helper ────────────────────────────────────────────────────────────────
+    // ─── Helpers ───────────────────────────────────────────────────────────────
     private static string GetMatchLevel(decimal score) =>
         score >= 0.85m ? "EXCELLENT" :
         score >= 0.70m ? "HIGH" :
         score >= 0.50m ? "MEDIUM" : "LOW";
 
+    // ✅ Structured deep analysis via Groq JSON mode — stored as JSON string
+    private async Task<string?> DeepAnalyzeAsync(JobDescription job, Resume resume)
+    {
+        var prompt = $@"Analyze this candidate for the role of '{job.Title}'.
+
+Job Description:
+{job.Content}
+
+Resume:
+{resume.Content}
+
+Return JSON with exactly these fields:
+{{
+  ""matchScore"": <integer 0-100 based on skill overlap>,
+  ""strengths"": [""3-5 specific strengths as strings""],
+  ""skillGaps"": [""specific missing skills""],
+  ""recommendation"": ""Yes | Conditional | No"",
+  ""reason"": ""one-line reason for the recommendation""
+}}";
+
+        var analysis = await _groqService.GenerateJsonAsync<ScreeningAnalysis>(prompt);
+        return analysis == null
+            ? null
+            : System.Text.Json.JsonSerializer.Serialize(analysis, new System.Text.Json.JsonSerializerOptions
+              {
+                  PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase // ✅ frontend parses camelCase
+              });
+    }
+
     // ─── Single Screening ───────────────────────────────────────────────────────
     [HttpPost("run")]
     public async Task<IActionResult> RunScreening(ScreeningRequestDTO dto)
     {
-        var resume = await _db.Resumes.FindAsync(dto.ResumeId);
-        var job = await _db.JobDescriptions.FindAsync(dto.JdId);
+        var userId = GetCurrentUserId();
+
+        // ✅ Ownership checks — only screen your own resumes against your own jobs
+        var resume = await _db.Resumes
+            .FirstOrDefaultAsync(r => r.Id == dto.ResumeId && r.UserId == userId);
+        var job = await _db.JobDescriptions
+            .FirstOrDefaultAsync(j => j.Id == dto.JdId && j.UserId == userId);
 
         if (resume == null) return NotFound(new { error = "Resume not found!" });
         if (job == null)    return NotFound(new { error = "Job not found!" });
@@ -48,23 +84,7 @@ public class ScreeningController : BaseController
         string? analysis = null;
         if (dto.DeepAnalyze && minilmScore >= 0.70m)
         {
-            var prompt = $@"You are HireIQ, an expert AI HR assistant. Analyze this candidate for the role of '{job.Title}'.
-
-Job Description:
-{job.Content}
-
-Resume:
-{resume.Content}
-
-Provide a structured analysis with:
-1. Overall Match Score (out of 100) based on skill overlap.
-2. Key Strengths (3–5 bullet points).
-3. Skill Gaps (what is missing).
-4. Final Interview Recommendation (Yes / Conditional / No) with a one-line reason.
-
-Be professional, concise, and specific.";
-
-            analysis = await _groqService.GenerateAsync(prompt);
+            analysis = await DeepAnalyzeAsync(job, resume); // ✅ structured JSON
         }
 
         var screening = new ScreeningResult
@@ -99,10 +119,12 @@ Be professional, concise, and specific.";
     [HttpGet("{id}")]
     public async Task<IActionResult> GetResult(Guid id)
     {
+        var userId = GetCurrentUserId();
+
         var result = await _db.ScreeningResults
             .Include(s => s.Resume)
             .Include(s => s.JobDescription)
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id && s.Resume!.UserId == userId); // ✅ ownership check
 
         if (result == null) return NotFound(new { error = "Result not found!" });
 
@@ -158,11 +180,15 @@ Be professional, concise, and specific.";
     [HttpPost("bulk")]
     public async Task<IActionResult> RunBulkScreening([FromBody] BatchScreeningDTO dto)
     {
-        var job = await _db.JobDescriptions.FindAsync(dto.JdId);
+        var userId = GetCurrentUserId();
+
+        // ✅ Ownership checks
+        var job = await _db.JobDescriptions
+            .FirstOrDefaultAsync(j => j.Id == dto.JdId && j.UserId == userId);
         if (job == null) return NotFound(new { error = "Job not found!" });
 
         var resumes = await _db.Resumes
-            .Where(r => dto.ResumeIds.Contains(r.Id))
+            .Where(r => dto.ResumeIds.Contains(r.Id) && r.UserId == userId)
             .ToListAsync();
 
         if (!resumes.Any())
@@ -186,23 +212,7 @@ Be professional, concise, and specific.";
 
             if (isShortlisted)
             {
-                var prompt = $@"You are HireIQ, an expert AI HR assistant. Analyze this candidate for the role of '{job.Title}'.
-
-Job Description:
-{job.Content}
-
-Resume:
-{resume.Content}
-
-Provide:
-1. Overall Match Score (out of 100).
-2. Key Strengths (3–5 bullet points).
-3. Skill Gaps.
-4. Final Interview Recommendation (Yes / Conditional / No) with a one-line reason.
-
-Be professional and concise.";
-
-                aiAnalysis = await _groqService.GenerateAsync(prompt);
+                aiAnalysis = await DeepAnalyzeAsync(job, resume); // ✅ structured JSON
             }
 
             screenings.Add(new ScreeningResult
@@ -254,7 +264,10 @@ Be professional and concise.";
         if (!validStatuses.Contains(dto.Status))
             return BadRequest(new { error = "Invalid status. Use: Screened, Interview, Hired, or Rejected." });
 
-        var result = await _db.ScreeningResults.FindAsync(id);
+        var userId = GetCurrentUserId();
+        var result = await _db.ScreeningResults
+            .Include(s => s.Resume)
+            .FirstOrDefaultAsync(s => s.Id == id && s.Resume!.UserId == userId); // ✅ ownership check
         if (result == null) return NotFound(new { error = "Screening result not found." });
 
         result.CandidateStatus = dto.Status;

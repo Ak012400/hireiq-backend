@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using HireIQ.API.Data;
 using HireIQ.API.DTOs;
@@ -11,13 +12,13 @@ namespace HireIQ.API.Controllers;
 [ApiController]
 [Route("api/mock-interview")]
 [Authorize]
+[EnableRateLimiting("ai")]
 public class MockInterviewController : BaseController
 {
     private readonly AppDbContext _db;
     private readonly GroqService _groq;
 
-    // In-memory session store (fine for demo — replace with Redis/DB for prod)
-    private static readonly Dictionary<Guid, MockSessionState> _sessions = new();
+    private const int MaxQuestions = 6;
 
     public MockInterviewController(AppDbContext db, GroqService groq)
     {
@@ -32,7 +33,6 @@ public class MockInterviewController : BaseController
             return BadRequest(new { error = "Job title is required." });
 
         var userId = GetCurrentUserId();
-        var sessionId = Guid.NewGuid();
 
         // Generate first question via Groq
         var prompt = $@"You are a senior technical interviewer conducting a mock interview for the role of '{dto.JobTitle}'.
@@ -44,103 +44,126 @@ Return ONLY the interviewer's spoken text — no labels, no formatting. Keep it 
 
         var firstQuestion = await _groq.GenerateAsync(prompt);
 
-        // Create session
-        var session = new MockSessionState
+        // ✅ Persist session in DB — survives restarts/redeploys (was an in-memory dictionary)
+        var session = new MockInterviewSession
         {
             UserId = userId,
             JobTitle = dto.JobTitle,
             JobDescription = dto.JobDescription,
             Questions = new List<string> { firstQuestion },
             Answers = new List<string>(),
-            ConversationHistory = new List<(string role, string content)>
-            {
-                ("system", $"You are a senior technical interviewer for the role of '{dto.JobTitle}'. Conduct a professional mock interview. Ask one question at a time. Be conversational. Evaluate each answer internally. After the final answer, provide detailed scoring."),
-                ("assistant", firstQuestion)
-            }
+            Status = "InProgress",
         };
 
-        _sessions[sessionId] = session;
+        _db.MockInterviewSessions.Add(session);
+        await _db.SaveChangesAsync();
 
-        return Ok(new { sessionId, question = firstQuestion });
+        return Ok(new { sessionId = session.Id, question = firstQuestion });
     }
 
     [HttpPost("answer")]
     public async Task<IActionResult> SubmitAnswer([FromBody] AnswerMockInterviewDTO dto)
     {
-        if (!_sessions.TryGetValue(dto.SessionId, out var session))
-            return NotFound(new { error = "Session not found or expired. Please start a new interview." });
+        var userId = GetCurrentUserId();
 
-        session.Answers.Add(dto.Answer);
-        session.ConversationHistory.Add(("user", dto.Answer));
+        // ✅ DB lookup + ownership check
+        var session = await _db.MockInterviewSessions
+            .FirstOrDefaultAsync(s => s.Id == dto.SessionId
+                                   && s.UserId == userId
+                                   && s.Status == "InProgress");
 
-        if (dto.IsLast || session.Answers.Count >= 6)
+        if (session == null)
+            return NotFound(new { error = "Session not found or already completed. Please start a new interview." });
+
+        // ✅ Reassign (not mutate) — EF change tracking on jsonb columns needs a new reference
+        session.Answers = new List<string>(session.Answers) { dto.Answer };
+
+        if (dto.IsLast || session.Answers.Count >= MaxQuestions)
         {
-            // Generate final evaluation
-            var evalPrompt = BuildEvalPrompt(session);
-            var evalText = await _groq.GenerateAsync(evalPrompt);
+            // ✅ Structured evaluation via Groq JSON mode — no regex parsing
+            var evaluation = await _groq.GenerateJsonAsync<InterviewEvaluation>(BuildEvalPrompt(session));
 
-            // Parse scores from eval (simple extraction)
-            var scores = ExtractScores(evalText);
-
-            // Save to DB
-            var dbSession = new MockInterviewSession
+            if (evaluation == null)
             {
-                UserId = session.UserId,
-                JobTitle = session.JobTitle,
-                JobDescription = session.JobDescription,
-                Questions = session.Questions,
-                Answers = session.Answers,
-                AiEvaluation = evalText,
-                TechnicalScore = scores.technical,
-                CommunicationScore = scores.communication,
-                ConfidenceScore = scores.confidence,
-                OverallScore = scores.overall,
-                DurationSeconds = (int)(DateTime.UtcNow - session.StartedAt).TotalSeconds,
-            };
-            _db.MockInterviewSessions.Add(dbSession);
-            await _db.SaveChangesAsync();
+                // Groq failed/returned invalid JSON — keep session alive so user can retry
+                return StatusCode(502, new { error = "AI evaluation failed. Please submit again." });
+            }
 
-            _sessions.Remove(dto.SessionId);
+            session.AiEvaluation = System.Text.Json.JsonSerializer.Serialize(evaluation, new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            });
+            session.TechnicalScore = evaluation.TechnicalScore;
+            session.CommunicationScore = evaluation.CommunicationScore;
+            session.ConfidenceScore = evaluation.ConfidenceScore;
+            session.OverallScore = evaluation.OverallScore;
+            session.DurationSeconds = (int)(DateTime.UtcNow - session.CreatedAt).TotalSeconds;
+            session.Status = "Completed";
+
+            await _db.SaveChangesAsync();
 
             return Ok(new
             {
                 finished = true,
                 report = new MockInterviewReportDTO
                 {
-                    TechnicalScore = scores.technical,
-                    CommunicationScore = scores.communication,
-                    ConfidenceScore = scores.confidence,
-                    OverallScore = scores.overall,
-                    Evaluation = evalText,
+                    TechnicalScore = evaluation.TechnicalScore,
+                    CommunicationScore = evaluation.CommunicationScore,
+                    ConfidenceScore = evaluation.ConfidenceScore,
+                    OverallScore = evaluation.OverallScore,
+                    Strengths = evaluation.Strengths,
+                    Improvements = evaluation.Improvements,
+                    Evaluation = evaluation.Feedback,
                 }
             });
         }
 
         // Generate next question
-        var nextPrompt = BuildNextQuestionPrompt(session, dto.Answer);
-        session.ConversationHistory.Add(("system", nextPrompt));
-        var nextQ = await _groq.GenerateAsync(nextPrompt);
-
-        session.Questions.Add(nextQ);
-        session.ConversationHistory.Add(("assistant", nextQ));
+        var nextQ = await _groq.GenerateAsync(BuildNextQuestionPrompt(session, dto.Answer));
+        session.Questions = new List<string>(session.Questions) { nextQ }; // ✅ new reference for EF
+        await _db.SaveChangesAsync();
 
         return Ok(new { finished = false, nextQuestion = nextQ });
     }
 
-    private string BuildNextQuestionPrompt(MockSessionState session, string lastAnswer)
+    // ✅ Resume an interrupted interview (page refresh / redeploy no longer kills it)
+    [HttpGet("active")]
+    public async Task<IActionResult> GetActiveSession()
+    {
+        var userId = GetCurrentUserId();
+
+        var session = await _db.MockInterviewSessions
+            .Where(s => s.UserId == userId && s.Status == "InProgress")
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (session == null) return Ok(new { active = false });
+
+        return Ok(new
+        {
+            active = true,
+            sessionId = session.Id,
+            jobTitle = session.JobTitle,
+            currentQuestion = session.Questions.LastOrDefault(),
+            questionNumber = session.Questions.Count,
+            totalQuestions = MaxQuestions,
+        });
+    }
+
+    private string BuildNextQuestionPrompt(MockInterviewSession session, string lastAnswer)
     {
         var history = string.Join("\n", session.Questions.Zip(session.Answers, (q, a) => $"Q: {q}\nA: {a}"));
-        return $@"You are interviewing a candidate for '{session.JobTitle}'. 
+        return $@"You are interviewing a candidate for '{session.JobTitle}'.
 Interview so far:
 {history}
 Latest answer: {lastAnswer}
 
 Ask the next interview question. Progress naturally: warm-up → technical skills → problem-solving → behavioral → situational → career goals.
-Question {session.Questions.Count + 1} of 6.
+Question {session.Questions.Count + 1} of {MaxQuestions}.
 Return ONLY the next question, naturally phrased. No labels.";
     }
 
-    private string BuildEvalPrompt(MockSessionState session)
+    private string BuildEvalPrompt(MockInterviewSession session)
     {
         var qa = string.Join("\n\n", session.Questions.Zip(session.Answers, (q, a) => $"Q: {q}\nA: {a}"));
         return $@"You evaluated a mock interview for '{session.JobTitle}'.
@@ -148,38 +171,17 @@ Return ONLY the next question, naturally phrased. No labels.";
 Full Interview:
 {qa}
 
-Provide a comprehensive evaluation with these exact sections:
-1. TECHNICAL SCORE: [number 0-100]
-2. COMMUNICATION SCORE: [number 0-100]
-3. CONFIDENCE SCORE: [number 0-100]
-4. OVERALL SCORE: [number 0-100]
-5. STRENGTHS: (2-3 specific points)
-6. AREAS TO IMPROVE: (2-3 specific points)
-7. DETAILED FEEDBACK: (2-3 paragraphs, specific and actionable)
+Return JSON with exactly these fields:
+{{
+  ""technicalScore"": <number 0-100>,
+  ""communicationScore"": <number 0-100>,
+  ""confidenceScore"": <number 0-100>,
+  ""overallScore"": <number 0-100>,
+  ""strengths"": [""2-3 specific points""],
+  ""improvements"": [""2-3 specific points""],
+  ""feedback"": ""2-3 paragraphs of specific, actionable feedback""
+}}
 
 Be honest, specific, and constructive.";
     }
-
-    private (decimal technical, decimal communication, decimal confidence, decimal overall) ExtractScores(string eval)
-    {
-        decimal Parse(string label)
-        {
-            var line = eval.Split('\n').FirstOrDefault(l => l.Contains(label, StringComparison.OrdinalIgnoreCase)) ?? "";
-            var num = new string(line.Where(c => char.IsDigit(c) || c == '.').ToArray());
-            return decimal.TryParse(num, out var v) ? Math.Min(v, 100) : 70;
-        }
-        return (Parse("TECHNICAL SCORE"), Parse("COMMUNICATION SCORE"), Parse("CONFIDENCE SCORE"), Parse("OVERALL SCORE"));
-    }
-}
-
-// In-memory session state
-public class MockSessionState
-{
-    public Guid UserId { get; set; }
-    public string JobTitle { get; set; } = string.Empty;
-    public string? JobDescription { get; set; }
-    public List<string> Questions { get; set; } = new();
-    public List<string> Answers { get; set; } = new();
-    public List<(string role, string content)> ConversationHistory { get; set; } = new();
-    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
 }

@@ -149,8 +149,10 @@ namespace HireIQ.API.Data
                 e.Property(x => x.ConfidenceScore).HasColumnName("confidence_score");
                 e.Property(x => x.OverallScore).HasColumnName("overall_score");
                 e.Property(x => x.DurationSeconds).HasColumnName("duration_seconds");
+                e.Property(x => x.Status).HasColumnName("status").HasDefaultValue("InProgress"); // ✅ session persistence
                 e.Property(x => x.CreatedAt).HasColumnName("created_at");
                 e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasIndex(x => new { x.UserId, x.Status }); // fast active-session lookup
             });
 
             // JobApplication

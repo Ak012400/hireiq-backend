@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using HireIQ.API.DTOs;
 using HireIQ.API.Services;
 
@@ -6,6 +7,7 @@ namespace HireIQ.API.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting("auth")] // ✅ brute-force protection
 public class AuthController : ControllerBase
 {
     private readonly AuthService _authService;

@@ -84,7 +84,7 @@ public class AuthService
             issuer: _config["JwtSettings:Issuer"],
             audience: _config["JwtSettings:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddDays(7),
+            expires: DateTime.UtcNow.AddHours(24), // ✅ 7 days → 24h (refresh tokens later)
             signingCredentials: new SigningCredentials(
                 key, SecurityAlgorithms.HmacSha256
             )

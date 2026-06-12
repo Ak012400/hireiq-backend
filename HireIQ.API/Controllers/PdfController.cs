@@ -5,10 +5,12 @@ using HireIQ.API.Models;
 using HireIQ.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 [ApiController]
 [Route("api/pdf")]
 [Authorize]
+[EnableRateLimiting("ai")]
 public class PdfController : BaseController
 {
     private readonly PdfExtractorService _extractor;

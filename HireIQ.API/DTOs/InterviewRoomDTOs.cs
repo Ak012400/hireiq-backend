@@ -45,7 +45,9 @@ public class MockInterviewReportDTO
     public decimal CommunicationScore { get; set; }
     public decimal ConfidenceScore { get; set; }
     public decimal OverallScore { get; set; }
-    public string Evaluation { get; set; } = string.Empty;
+    public List<string> Strengths { get; set; } = new();      // ✅ structured (was buried in free text)
+    public List<string> Improvements { get; set; } = new();   // ✅ structured
+    public string Evaluation { get; set; } = string.Empty;    // detailed feedback paragraphs
 }
 
 public class ApplyJobDTO

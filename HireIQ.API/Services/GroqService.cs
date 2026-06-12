@@ -119,18 +119,52 @@ Never repeatedly mention your creator in responses.
         return await CallGroq(messages, maxTokens: 1024);
     }
 
+    // ── Structured JSON output (Groq JSON mode) ──────────
+    // Returns a strongly-typed object instead of free text — no more regex parsing.
+    public async Task<T?> GenerateJsonAsync<T>(string prompt) where T : class
+    {
+        var messages = new List<object>
+        {
+            new { role = "system", content = "You are HireIQ, an expert AI HR assistant. Respond ONLY with valid JSON matching the schema described by the user. No markdown, no extra text." },
+            new { role = "user", content = prompt }
+        };
+
+        var raw = await CallGroq(messages, maxTokens: 4000, jsonMode: true, temperature: 0.3);
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(raw, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch
+        {
+            return null; // caller decides fallback
+        }
+    }
+
     // ── Internal Groq Call ────────────────────────────────
-    private async Task<string> CallGroq(List<object> messages, int maxTokens = 5000)
+    private async Task<string> CallGroq(List<object> messages, int maxTokens = 5000, bool jsonMode = false, double temperature = 0.7)
     {
         try
         {
-            var payload = new
-            {
-                model = GROQ_MODEL,
-                messages,
-                max_tokens = maxTokens,
-                temperature = 0.7
-            };
+            object payload = jsonMode
+                ? new
+                {
+                    model = GROQ_MODEL,
+                    messages,
+                    max_tokens = maxTokens,
+                    temperature,
+                    response_format = new { type = "json_object" }
+                }
+                : new
+                {
+                    model = GROQ_MODEL,
+                    messages,
+                    max_tokens = maxTokens,
+                    temperature
+                };
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
