@@ -14,6 +14,7 @@ public class MockInterviewSession
     public decimal? ConfidenceScore { get; set; }
     public decimal? OverallScore { get; set; }
     public int? DurationSeconds { get; set; }
+    public string Status { get; set; } = "InProgress"; // ✅ InProgress | Completed — survives restarts
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public User? User { get; set; }

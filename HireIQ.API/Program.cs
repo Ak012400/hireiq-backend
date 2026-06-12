@@ -1,10 +1,13 @@
 using HireIQ.API.Data;
 using HireIQ.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,15 +40,49 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// CORS
+// ✅ CORS — env-configurable allowed origins (no more AllowAnyOrigin)
+// Set Cors__AllowedOrigins on Render, e.g. "https://hireiq.vercel.app;http://localhost:3000"
+var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:3000")
+    .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("Frontend", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
+});
+
+// ✅ Rate limiting (built-in .NET) — protects auth from brute force, AI endpoints from abuse
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Auth: 10 attempts/min per IP
+    options.AddFixedWindowLimiter("auth", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.PermitLimit = 10;
+        o.QueueLimit = 0;
+    });
+
+    // AI endpoints: 30 requests/min per IP (Groq/HF calls are expensive)
+    options.AddFixedWindowLimiter("ai", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.PermitLimit = 30;
+        o.QueueLimit = 0;
+    });
+});
+
+// ✅ Render/Vercel sit behind a reverse proxy — trust X-Forwarded-* headers
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 // Swagger
@@ -107,9 +144,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCors("AllowAll");
-//app.UseHttpsRedirection();
-app.UseAuthentication(); // ✅ PEHLE ye — YE BHI MISSING THA!
-app.UseAuthorization();  // ✅ BAAD MEIN ye
+app.UseForwardedHeaders();   // ✅ must run before HTTPS redirect (proxy-aware)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection(); // ✅ re-enabled for production
+}
+app.UseCors("Frontend");
+app.UseRateLimiter();        // ✅ rate limiting
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.Run();
