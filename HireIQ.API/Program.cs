@@ -43,7 +43,9 @@ builder.Services.AddAuthorization();
 // ✅ CORS — env-configurable allowed origins (no more AllowAnyOrigin)
 // Set Cors__AllowedOrigins on Render, e.g. "https://hireiq.vercel.app;http://localhost:3000"
 var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:3000")
-    .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Select(o => o.TrimEnd('/')) // ✅ CORS origins never have trailing slashes
+    .ToArray();
 
 builder.Services.AddCors(options =>
 {
