@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using HireIQ.API.Data;
 using HireIQ.API.DTOs;
 using HireIQ.API.Models;
+using HireIQ.API.Services;
 using System.Text.Json;
 
 namespace HireIQ.API.Controllers;
@@ -14,10 +15,14 @@ namespace HireIQ.API.Controllers;
 public class InterviewRoomController : BaseController
 {
     private readonly AppDbContext _db;
+    private readonly EmailService _email;
+    private readonly IConfiguration _config;
 
-    public InterviewRoomController(AppDbContext db)
+    public InterviewRoomController(AppDbContext db, EmailService email, IConfiguration config)
     {
         _db = db;
+        _email = email;
+        _config = config;
     }
 
     private static string GenerateRoomCode()
@@ -79,7 +84,10 @@ public class InterviewRoomController : BaseController
             JobId        = dto.JobId,
             CandidateEmail  = dto.CandidateEmail,
             CandidateName   = dto.CandidateName,
-            ScheduledAt     = dto.ScheduledAt,
+            // ✅ Npgsql timestamptz needs UTC — convert whatever the frontend sends
+            ScheduledAt     = dto.ScheduledAt.HasValue
+                ? DateTime.SpecifyKind(dto.ScheduledAt.Value, DateTimeKind.Utc)
+                : null,
             PresetQuestions = dto.PresetQuestions,
         };
 
@@ -97,6 +105,20 @@ public class InterviewRoomController : BaseController
         if (room.JobId.HasValue)
             job = await _db.JobDescriptions.FindAsync(room.JobId.Value);
 
+        // ✅ Send interview invitation email — never fail room creation if email fails
+        bool emailSent = false;
+        try
+        {
+            var frontendUrl = (_config["Cors:AllowedOrigins"] ?? "http://localhost:3000")
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .First().TrimEnd('/');
+            emailSent = await _email.SendInterviewInviteAsync(
+                room.CandidateEmail, room.CandidateName ?? "", job?.Title ?? "",
+                room.ScheduledAt, room.RoomCode, room.RoomPassword,
+                $"{frontendUrl}/interview-rooms?code={room.RoomCode}");
+        }
+        catch { /* logged inside EmailService */ }
+
         return Ok(new InterviewRoomResponseDTO
         {
             Id = room.Id,
@@ -111,6 +133,7 @@ public class InterviewRoomController : BaseController
             PresetQuestions = room.PresetQuestions,
             FinalDecision = room.FinalDecision,
             CreatedAt = room.CreatedAt,
+            EmailSent = emailSent,
         });
     }
 

@@ -108,6 +108,63 @@ Return JSON with exactly this structure:
             return Ok(data);
         }
 
+        // ── AI Coach: conversational resume improvement with applicable updates ──
+        [HttpPost("coach")]
+        public async Task<IActionResult> Coach([FromBody] CoachRequestDTO dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Message))
+                return BadRequest(new { error = "Message required." });
+
+            var resumeJson = dto.Resume == null
+                ? "(empty — user hasn't added resume data yet)"
+                : System.Text.Json.JsonSerializer.Serialize(dto.Resume, new System.Text.Json.JsonSerializerOptions
+                  {
+                      PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                  });
+
+            var history = string.Join("\n", dto.History.TakeLast(6).Select(h => $"{h.Role}: {h.Content}"));
+
+            var prompt = $@"You are HireIQ Resume Coach — a friendly expert resume advisor chatting with a candidate while their resume is visible next to the chat.
+
+Current resume (JSON):
+{resumeJson}
+
+Recent conversation:
+{history}
+
+User's message: {dto.Message}
+
+Respond conversationally AND propose concrete resume updates the user can apply with one click.
+Rules:
+- reply: 2-4 sentences, helpful and specific. Mention WHY each change helps.
+- updates: 0-3 items. Only propose updates when relevant. Each update FULLY REPLACES that section's text.
+- section must be one of: summary, role, skills, experience, projects, education, extra.
+- For skills: content is a comma-separated list (complete list, not just additions).
+- For experience/projects/education: content is the complete improved text for that section (one entry per line).
+- Use strong action verbs. Never invent employers, degrees, or numbers the user hasn't mentioned.
+
+Return JSON with exactly this structure:
+{{
+  ""reply"": ""conversational answer"",
+  ""updates"": [
+    {{""section"": ""summary"", ""title"": ""short label"", ""content"": ""new text""}}
+  ]
+}}";
+
+            var result = await _groq.GenerateJsonAsync<CoachResponse>(prompt);
+            if (result == null)
+                return StatusCode(502, new { error = "Coach is unavailable right now. Try again." });
+
+            // Defensive: drop updates with unknown sections
+            var valid = new[] { "summary", "role", "skills", "experience", "projects", "education", "extra" };
+            result.Updates = result.Updates
+                .Where(u => valid.Contains(u.Section?.ToLowerInvariant()))
+                .Take(3)
+                .ToList();
+
+            return Ok(result);
+        }
+
         [HttpPost("generate-pdf")]
         public async Task<IActionResult> GeneratePdf([FromBody] GeneratePdfDTO dto)
         {

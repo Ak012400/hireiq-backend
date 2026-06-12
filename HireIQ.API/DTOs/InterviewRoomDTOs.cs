@@ -23,6 +23,7 @@ public class InterviewRoomResponseDTO
     public List<string> PresetQuestions { get; set; } = new();
     public string FinalDecision { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public bool EmailSent { get; set; } // ✅ invitation email status
 }
 
 public class StartMockInterviewDTO
