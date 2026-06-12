@@ -10,6 +10,50 @@ public class ScreeningAnalysis
     public string Reason { get; set; } = string.Empty;
 }
 
+// ── Structured resume data (AI redesign + keyword generation) ───────────────
+// Shape mirrors frontend resumeTemplates.js — don't rename fields casually.
+public class ResumeData
+{
+    public string Name { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+    public string Linkedin { get; set; } = string.Empty;
+    public string Github { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public List<string> Skills { get; set; } = new();
+    public List<ExperienceItem> Experience { get; set; } = new();
+    public List<EducationItem> Education { get; set; } = new();
+    public List<ProjectItem> Projects { get; set; } = new();
+    public string Extra { get; set; } = string.Empty;
+}
+
+public class ExperienceItem
+{
+    public string Title { get; set; } = string.Empty;
+    public string Company { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+}
+
+public class EducationItem
+{
+    public string Degree { get; set; } = string.Empty;
+    public string School { get; set; } = string.Empty;
+}
+
+public class ProjectItem
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+}
+
+public class AiGenerateResumeDTO
+{
+    public string Keywords { get; set; } = string.Empty;   // e.g. "senior react developer, 3 years, fintech"
+    public string? TargetRole { get; set; }
+    public string? Name { get; set; }
+}
+
 // ── Structured mock-interview evaluation (Groq JSON mode) ───────────────────
 public class InterviewEvaluation
 {
