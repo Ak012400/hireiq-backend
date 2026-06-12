@@ -123,6 +123,7 @@ builder.Services.AddScoped<PdfService>();
 builder.Services.AddScoped<PdfExtractorService>();
 builder.Services.AddScoped<MLService>();
 builder.Services.AddScoped<GroqService>();
+builder.Services.AddScoped<EmailService>(); // ✅ interview invites etc.
 builder.Services.AddSingleton<MongoDbService>();
 
 // HttpClient

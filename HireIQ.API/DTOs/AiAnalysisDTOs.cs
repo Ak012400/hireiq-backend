@@ -54,6 +54,33 @@ public class AiGenerateResumeDTO
     public string? Name { get; set; }
 }
 
+// ── AI Coach Room: chat + structured resume updates ─────────────────────────
+public class CoachRequestDTO
+{
+    public string Message { get; set; } = string.Empty;          // user's chat message
+    public ResumeData? Resume { get; set; }                       // current resume state
+    public List<CoachHistoryItem> History { get; set; } = new();  // recent chat turns
+}
+
+public class CoachHistoryItem
+{
+    public string Role { get; set; } = "user";   // user | assistant
+    public string Content { get; set; } = string.Empty;
+}
+
+public class CoachResponse
+{
+    public string Reply { get; set; } = string.Empty;            // conversational answer
+    public List<CoachUpdate> Updates { get; set; } = new();      // suggested resume changes
+}
+
+public class CoachUpdate
+{
+    public string Section { get; set; } = string.Empty;  // summary | role | skills | experience | projects | education | extra
+    public string Title { get; set; } = string.Empty;    // short label, e.g. "Stronger summary"
+    public string Content { get; set; } = string.Empty;  // the new text (skills: comma-separated)
+}
+
 // ── Structured mock-interview evaluation (Groq JSON mode) ───────────────────
 public class InterviewEvaluation
 {
