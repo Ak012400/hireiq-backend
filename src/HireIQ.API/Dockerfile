@@ -1,18 +1,5 @@
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
-WORKDIR /app
-EXPOSE 8080
-
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-WORKDIR /src
-COPY ["HireIQ.API.csproj", "."]
-RUN dotnet restore
-COPY . .
-RUN dotnet build -c Release -o /app/build
-
-FROM build AS publish
-RUN dotnet publish -c Release -o /app/publish
-
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "HireIQ.API.dll"]
+# Deprecated — multi-project Dockerfile lives at the repo root now.
+# Render's "Root Directory" should be empty (or `.`), and Dockerfile Path = `Dockerfile`.
+# Kept here as a redirect so old Render configs fail loudly instead of silently using stale instructions.
+FROM busybox
+RUN echo "ERROR: Use the Dockerfile at the repo root. Update Render: Root Directory = '', Dockerfile Path = 'Dockerfile'." && exit 1

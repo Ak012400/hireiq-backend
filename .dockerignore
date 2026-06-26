@@ -1,0 +1,10 @@
+**/bin
+**/obj
+**/.vs
+**/node_modules
+_legacy_HireIQ.API
+.git
+.github
+.gitignore
+.gitattributes
+*.md
