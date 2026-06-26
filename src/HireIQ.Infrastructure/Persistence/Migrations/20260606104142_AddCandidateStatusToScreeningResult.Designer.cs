@@ -25,7 +25,7 @@ namespace HireIQ.API.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("HireIQ.API.Models.Conversation", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -57,7 +57,7 @@ namespace HireIQ.API.Migrations
                     b.ToTable("conversations", (string)null);
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.CustomResumeField", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.CustomResumeField", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -98,7 +98,7 @@ namespace HireIQ.API.Migrations
                     b.ToTable("custom_resume_fields", (string)null);
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.GeneratedResume", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.GeneratedResume", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -128,7 +128,7 @@ namespace HireIQ.API.Migrations
                     b.ToTable("generated_resumes", (string)null);
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.JobDescription", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.JobDescription", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -160,7 +160,7 @@ namespace HireIQ.API.Migrations
                     b.ToTable("job_descriptions", (string)null);
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.Resume", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.Resume", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -196,7 +196,7 @@ namespace HireIQ.API.Migrations
                     b.ToTable("resumes", (string)null);
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.Template", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.Template", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(50)
@@ -243,7 +243,7 @@ namespace HireIQ.API.Migrations
                     b.ToTable("templates", (string)null);
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.User", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -326,9 +326,9 @@ namespace HireIQ.API.Migrations
                     b.ToTable("screening_results", (string)null);
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.Conversation", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.Conversation", b =>
                 {
-                    b.HasOne("HireIQ.API.Models.User", "User")
+                    b.HasOne("HireIQ.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -337,9 +337,9 @@ namespace HireIQ.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.CustomResumeField", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.CustomResumeField", b =>
                 {
-                    b.HasOne("HireIQ.API.Models.User", "User")
+                    b.HasOne("HireIQ.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -348,9 +348,9 @@ namespace HireIQ.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.GeneratedResume", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.GeneratedResume", b =>
                 {
-                    b.HasOne("HireIQ.API.Models.User", "User")
+                    b.HasOne("HireIQ.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -359,9 +359,9 @@ namespace HireIQ.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.JobDescription", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.JobDescription", b =>
                 {
-                    b.HasOne("HireIQ.API.Models.User", "User")
+                    b.HasOne("HireIQ.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -370,9 +370,9 @@ namespace HireIQ.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("HireIQ.API.Models.Resume", b =>
+            modelBuilder.Entity("HireIQ.Domain.Entities.Resume", b =>
                 {
-                    b.HasOne("HireIQ.API.Models.User", "User")
+                    b.HasOne("HireIQ.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -383,13 +383,13 @@ namespace HireIQ.API.Migrations
 
             modelBuilder.Entity("ScreeningResult", b =>
                 {
-                    b.HasOne("HireIQ.API.Models.JobDescription", "JobDescription")
+                    b.HasOne("HireIQ.Domain.Entities.JobDescription", "JobDescription")
                         .WithMany()
                         .HasForeignKey("JdId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("HireIQ.API.Models.Resume", "Resume")
+                    b.HasOne("HireIQ.Domain.Entities.Resume", "Resume")
                         .WithMany()
                         .HasForeignKey("ResumeId")
                         .OnDelete(DeleteBehavior.Cascade)
