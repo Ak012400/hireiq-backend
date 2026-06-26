@@ -1,4 +1,5 @@
-﻿using HireIQ.Domain.Entities;
+﻿using Microsoft.Extensions.Configuration;
+using HireIQ.Domain.Entities;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
