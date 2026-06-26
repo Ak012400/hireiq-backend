@@ -56,7 +56,9 @@ public static class DependencyInjection
         services.AddScoped<IEmailService>(sp => sp.GetRequiredService<SmtpEmailService>());
 
         // === AI ===
-        services.AddHttpClient<GroqService>();
+        // GroqService manages its own HttpClient internally (Timeout = 130s for long Groq calls).
+        // Use plain Scoped registration, NOT AddHttpClient<T> — typed client requires HttpClient as first ctor param.
+        services.AddScoped<GroqService>();
         services.AddScoped<IAiService, GroqAiService>();
         services.AddScoped<MLService>();
 
