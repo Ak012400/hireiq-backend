@@ -35,6 +35,7 @@ namespace HireIQ.Infrastructure.Persistence
         public DbSet<InterviewFinalScore> InterviewFinalScores { get; set; } = null!;
         public DbSet<HrInterview> HrInterviews { get; set; } = null!;
         public DbSet<HiringDecision> HiringDecisions { get; set; } = null!;
+        public DbSet<ConsentRecord> ConsentRecords { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -443,6 +444,24 @@ namespace HireIQ.Infrastructure.Persistence
                 e.Property(x => x.CreatedAt).HasColumnName("created_at");
                 e.HasOne(x => x.CandidateJourney).WithMany().HasForeignKey(x => x.CandidateJourneyId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(x => x.Hirer).WithMany().HasForeignKey(x => x.HirerId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // === ConsentRecord ===
+            mb.Entity<ConsentRecord>(e =>
+            {
+                e.ToTable("consent_records");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.UserId).HasColumnName("user_id");
+                e.Property(x => x.Kind).HasColumnName("kind").HasConversion<string>().HasMaxLength(40);
+                e.Property(x => x.RelatedEntityId).HasColumnName("related_entity_id");
+                e.Property(x => x.PolicyVersion).HasColumnName("policy_version").HasMaxLength(20);
+                e.Property(x => x.Granted).HasColumnName("granted");
+                e.Property(x => x.Withdrawn).HasColumnName("withdrawn");
+                e.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(45);
+                e.Property(x => x.UserAgent).HasColumnName("user_agent");
+                e.Property(x => x.RecordedAt).HasColumnName("recorded_at");
+                e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasIndex(x => new { x.UserId, x.Kind, x.RelatedEntityId, x.RecordedAt });
             });
 
             // === HiringDecision ===

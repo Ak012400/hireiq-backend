@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using Hangfire;
+using HireIQ.API.Hangfire;
 using HireIQ.API.Hubs;
 using HireIQ.Application;
 using HireIQ.Application.Interfaces;
@@ -132,8 +133,11 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Hangfire dashboard at /hangfire (TODO: lock down to admin role in production)
-app.UseHangfireDashboard("/hangfire");
+// Hangfire dashboard — locked to authenticated admin/hirer users only
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new AdminOnlyAuthorizationFilter() }
+});
 
 app.MapControllers();
 app.MapHub<InterviewHub>("/hubs/interview");
