@@ -94,6 +94,13 @@ public static class DependencyInjection
         services.AddScoped<IHiringPipelineService, HiringPipelineService>();
         services.AddScoped<IEmailTemplateService, EmailTemplateService>();
         services.AddScoped<IEmailQueueService, EmailQueueService>();
+        services.AddScoped<IApplicationIntakeService, ApplicationIntakeService>();
+        services.AddScoped<IAutoScreeningOrchestrator, AutoScreeningOrchestrator>();
+        services.AddScoped<AutoScreeningOrchestrator>();
+
+        // Transcription + media server
+        services.AddScoped<ITranscriptionService, WhisperTranscriptionService>();
+        services.AddScoped<IMediaServerService, LiveKitMediaService>();
 
         // Job-board connectors
         services.AddScoped<IndeedFeedConnector>();

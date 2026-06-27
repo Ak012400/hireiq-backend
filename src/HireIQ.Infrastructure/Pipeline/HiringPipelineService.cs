@@ -24,6 +24,10 @@ public sealed class HiringPipelineService : IHiringPipelineService
         _logger = logger;
     }
 
+    // ⚠ Consent-gate guard for transitions that touch personal data.
+    // Caller MUST verify consent before invoking TransitionAsync for AI interview stages.
+    // (Enforced at controller boundary via ConsentController; this comment is the contract.)
+
     // ── Allowed forward transitions (defensive — keeps callers honest) ──
     private static readonly Dictionary<PipelineStage, HashSet<PipelineStage>> Allowed = new()
     {
