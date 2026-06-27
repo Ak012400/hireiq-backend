@@ -62,9 +62,11 @@ public static class DependencyInjection
         services.AddScoped<IAiService, GroqAiService>();
         services.AddScoped<MLService>();
 
-        // === PDF ===
-        services.AddScoped<IPdfService, PdfService>();
-        services.AddScoped<IPdfExtractorService, PdfExtractorService>();
+        // === PDF === (concrete also registered — legacy controllers inject concrete types)
+        services.AddScoped<PdfService>();
+        services.AddScoped<IPdfService>(sp => sp.GetRequiredService<PdfService>());
+        services.AddScoped<PdfExtractorService>();
+        services.AddScoped<IPdfExtractorService>(sp => sp.GetRequiredService<PdfExtractorService>());
 
         // === Mongo (legacy / agent memory) ===
         services.AddSingleton<MongoDbService>();
