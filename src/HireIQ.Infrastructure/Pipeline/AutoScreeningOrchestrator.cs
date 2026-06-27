@@ -53,7 +53,7 @@ public sealed class AutoScreeningOrchestrator : IAutoScreeningOrchestrator
             {
                 ResumeId = resume.Id,
                 JdId = app.Job.Id,
-                MinilmScore = score,
+                MinilmScore = (decimal)score,
                 HireiqAnalysis = analysis,
                 Shortlisted = shortlist,
                 CandidateStatus = "Screened"
