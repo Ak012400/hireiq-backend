@@ -1,11 +1,15 @@
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
+using Hangfire;
+using HireIQ.API.Hubs;
 using HireIQ.Application;
+using HireIQ.Application.Interfaces;
 using HireIQ.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +22,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services
     .AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
+
+// === SignalR (real-time AI interview channel) ===
+builder.Services.AddSignalR();
 
 // === JWT Authentication ===
 var jwtKey = builder.Configuration["JwtSettings:SecretKey"] ?? "";
@@ -124,6 +131,30 @@ app.UseCors("Frontend");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Hangfire dashboard at /hangfire (TODO: lock down to admin role in production)
+app.UseHangfireDashboard("/hangfire");
+
 app.MapControllers();
+app.MapHub<InterviewHub>("/hubs/interview");
+
+// Auto-apply pending EF migrations + seed defaults on startup.
+// Render-friendly: no manual `dotnet ef database update` needed after each deploy.
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<HireIQ.Infrastructure.Persistence.AppDbContext>();
+        await db.Database.MigrateAsync();
+        app.Logger.LogInformation("EF migrations applied");
+
+        var templates = scope.ServiceProvider.GetRequiredService<IEmailTemplateService>();
+        await templates.SeedDefaultsAsync();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Startup migration/seed skipped (DB may not be reachable yet)");
+    }
+}
 
 app.Run();

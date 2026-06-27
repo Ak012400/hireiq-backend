@@ -1,13 +1,18 @@
 using Azure.Storage.Blobs;
+using Hangfire;
+using Hangfire.PostgreSql;
 using HireIQ.Application.Interfaces;
 using HireIQ.Domain.Interfaces;
 using HireIQ.Infrastructure.Ai;
+using HireIQ.Infrastructure.Ai.Interview;
 using HireIQ.Infrastructure.Cache;
 using HireIQ.Infrastructure.Email;
 using HireIQ.Infrastructure.Identity;
+using HireIQ.Infrastructure.JobBoards;
 using HireIQ.Infrastructure.Persistence;
 using HireIQ.Infrastructure.Persistence.Repositories;
 using HireIQ.Infrastructure.Pdf;
+using HireIQ.Infrastructure.Pipeline;
 using HireIQ.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -76,6 +81,32 @@ public static class DependencyInjection
         {
             c.BaseAddress = new Uri(config["FlaskService:BaseUrl"] ?? "http://127.0.0.1:5000");
         });
+
+        // === Hangfire (background jobs — Postgres-backed) ===
+        services.AddHangfire(cfg => cfg
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(o => o.UseNpgsqlConnection(config.GetConnectionString("DefaultConnection"))));
+        services.AddHangfireServer();
+
+        // === Phase-2 hiring automation services ===
+        services.AddScoped<IHiringPipelineService, HiringPipelineService>();
+        services.AddScoped<IEmailTemplateService, EmailTemplateService>();
+        services.AddScoped<IEmailQueueService, EmailQueueService>();
+
+        // Job-board connectors
+        services.AddScoped<IndeedFeedConnector>();
+        services.AddScoped<LinkedInShareConnector>();
+        services.AddScoped<IJobBoardConnector, IndeedFeedConnector>();
+        services.AddScoped<IJobBoardConnector, LinkedInShareConnector>();
+
+        // AI Interview swarm (3 agents + orchestrator)
+        services.AddScoped<IFastQuestionAgent, GroqFastQuestionAgent>();
+        services.AddScoped<IDeepAnswerAgent, GroqDeepAnswerAgent>();
+        services.AddScoped<IVisualBehaviorAgent, GeminiVisualBehaviorAgent>();
+        services.AddScoped<IInterviewOrchestrator, InterviewOrchestrator>();
+        services.AddScoped<InterviewOrchestrator>();  // also concrete — Hangfire jobs use the concrete type
 
         return services;
     }
