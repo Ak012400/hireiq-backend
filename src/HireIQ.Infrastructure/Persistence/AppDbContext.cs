@@ -36,6 +36,7 @@ namespace HireIQ.Infrastructure.Persistence
         public DbSet<HrInterview> HrInterviews { get; set; } = null!;
         public DbSet<HiringDecision> HiringDecisions { get; set; } = null!;
         public DbSet<ConsentRecord> ConsentRecords { get; set; } = null!;
+        public DbSet<HirerIntegration> HirerIntegrations { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -444,6 +445,26 @@ namespace HireIQ.Infrastructure.Persistence
                 e.Property(x => x.CreatedAt).HasColumnName("created_at");
                 e.HasOne(x => x.CandidateJourney).WithMany().HasForeignKey(x => x.CandidateJourneyId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(x => x.Hirer).WithMany().HasForeignKey(x => x.HirerId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // === HirerIntegration ===
+            mb.Entity<HirerIntegration>(e =>
+            {
+                e.ToTable("hirer_integrations");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.HirerId).HasColumnName("hirer_id");
+                e.Property(x => x.Board).HasColumnName("board").HasConversion<string>().HasMaxLength(20);
+                e.Property(x => x.Enabled).HasColumnName("enabled");
+                e.Property(x => x.ApiKey).HasColumnName("api_key");
+                e.Property(x => x.ApiSecret).HasColumnName("api_secret");
+                e.Property(x => x.AccessToken).HasColumnName("access_token");
+                e.Property(x => x.AccessTokenExpiresAt).HasColumnName("access_token_expires_at");
+                e.Property(x => x.RefreshToken).HasColumnName("refresh_token");
+                e.Property(x => x.ConfigJson).HasColumnName("config_json").HasColumnType("jsonb");
+                e.Property(x => x.CreatedAt).HasColumnName("created_at");
+                e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+                e.HasOne(x => x.Hirer).WithMany().HasForeignKey(x => x.HirerId).OnDelete(DeleteBehavior.Cascade);
+                e.HasIndex(x => new { x.HirerId, x.Board }).IsUnique();
             });
 
             // === ConsentRecord ===
