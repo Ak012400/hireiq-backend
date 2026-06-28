@@ -72,6 +72,8 @@ public static class DependencyInjection
         services.AddScoped<IPdfService>(sp => sp.GetRequiredService<PdfService>());
         services.AddScoped<PdfExtractorService>();
         services.AddScoped<IPdfExtractorService>(sp => sp.GetRequiredService<PdfExtractorService>());
+        // Unified document parser (PDF, DOCX, XLSX, CSV, TXT) — used by JobPostingAiController
+        services.AddScoped<IDocumentParserService, DocumentParserService>();
 
         // === Mongo (legacy / agent memory) ===
         services.AddSingleton<MongoDbService>();
