@@ -105,8 +105,12 @@ public static class DependencyInjection
         // Job-board connectors
         services.AddScoped<IndeedFeedConnector>();
         services.AddScoped<LinkedInShareConnector>();
+        services.AddScoped<NaukriConnector>();
+        services.AddScoped<GlassdoorConnector>();
         services.AddScoped<IJobBoardConnector, IndeedFeedConnector>();
         services.AddScoped<IJobBoardConnector, LinkedInShareConnector>();
+        services.AddScoped<IJobBoardConnector, NaukriConnector>();
+        services.AddScoped<IJobBoardConnector, GlassdoorConnector>();
 
         // AI Interview swarm (3 agents + orchestrator)
         services.AddScoped<IFastQuestionAgent, GroqFastQuestionAgent>();
