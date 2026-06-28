@@ -22,7 +22,16 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // === MVC + JSON ===
 builder.Services
     .AddControllers()
-    .AddJsonOptions(o => o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        // Accept enums as strings in JSON (frontend sends "PartTime", not 1).
+        // Also case-insensitive so "parttime" / "PartTime" / "PART_TIME" all work.
+        o.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter(
+                JsonNamingPolicy.CamelCase,
+                allowIntegerValues: true));
+    });
 
 // === SignalR (real-time AI interview channel) ===
 builder.Services.AddSignalR();
